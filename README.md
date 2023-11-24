@@ -1,0 +1,1 @@
+# react-native-mathjax-html-to-text-svg
