@@ -191,7 +191,7 @@ const GenerateTextComponent = ({
       ]}
       textBreakStrategy="highQuality"
     >
-      {cleanText.split("@+#").map((chunk, i) => {
+      {cleanText.split("@+").map((chunk, i) => {
         if (i % 2 === 0) {
           return chunk;
         } else {
