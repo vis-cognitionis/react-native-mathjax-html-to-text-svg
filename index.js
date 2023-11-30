@@ -80,16 +80,17 @@ const applyColor = (svgString, fillColor) => {
   return svgString.replace(/currentColor/gim, `${fillColor}`);
 };
 
-const GenerateSvgComponent = ({ item, fontSize, color }) => {
+const GenerateSvgComponent = ({ item, fontSize, color, setIsTabular }) => {
   let svgText = adaptor.innerHTML(item);
 
   const [width, height] = getScale(svgText);
 
   svgText = svgText.replace(/font-family=\"([^\"]*)\"/gim, "");
   svgText = svgText.replace(
-    /<rect/g,
-    '<rect fill="transparent" stroke="white" stroke-width="30" '
+    /<rect\b[^>]*>/g,
+    '<rect fill="transparent" stroke="white" stroke-width="30">'
   );
+
   //to hide for tables
   svgText = svgText.replace(/<g[^>]*data-mml-node="merror"[^>]*>/g, "");
   svgText = svgText.replace(/fill="([^\"]*)"/gim, `fill=${color}`);
@@ -99,6 +100,9 @@ const GenerateSvgComponent = ({ item, fontSize, color }) => {
 
   svgText = applyScale(svgText, [(width * fontSize) / 1.1, height * fontSize]);
   svgText = applyColor(svgText, color);
+
+  const isTabular = svgText.includes("tabular");
+  setIsTabular(isTabular);
 
   return (
     <Text allowFontScaling={false}>
@@ -119,6 +123,7 @@ const GenerateTextComponent = ({
 }) => {
   let rnStyle = null;
   let text = null;
+  const [isTabular, setIsTabular] = React.useState(false);
 
   if (
     item?.kind !== "#text" &&
@@ -209,6 +214,7 @@ const GenerateTextComponent = ({
       item={item}
       fontSize={fontSize}
       color={color}
+      setIsTabular={setIsTabular}
     />
   ) : item.children?.length ? (
     item.children.map((subItem, subIndex) => (
@@ -255,7 +261,10 @@ const GenerateTextComponent = ({
     return (
       <ScrollView
         horizontal={true}
-        contentContainerStyle={containerStyle}
+        contentContainerStyle={[
+          containerStyle,
+          { display: isTabular ? "none" : "flex" },
+        ]}
         scrollIndicatorInsets={{ top: 30 }}
         showsHorizontalScrollIndicator={false}
         persistentScrollbar={false}
