@@ -93,7 +93,7 @@ const GenerateSvgComponent = ({ item, fontSize, color, setIsTabular }) => {
 
   //to hide for tables
   svgText = svgText.replace(/<g[^>]*data-mml-node="merror"[^>]*>/g, "");
-  svgText = svgText.replace(/fill="([^\"]*)"/gim, `fill=${color}`);
+  // svgText = svgText.replace(/fill="([^\"]*)"/gim, `fill=${color}`);
 
   svgText = svgText.replace(/\\llbracket/g, "⟦");
   svgText = svgText.replace(/\\rrbracket/g, "⟧");
