@@ -247,6 +247,8 @@ const GenerateTextComponent = ({
     display: text?.trim() === "" ? "none" : "flex",
     marginVertical: 1,
     flexGrow: 1,
+    borderColor: "transparent",
+    borderWidth: 1,
   };
 
   const scrollContainerStyle = {
