@@ -93,7 +93,7 @@ const GenerateSvgComponent = ({ item, fontSize, color, setIsTabular }) => {
 
   //to hide for tables
   svgText = svgText.replace(/<g[^>]*data-mml-node="merror"[^>]*>/g, "");
-  // svgText = svgText.replace(/fill="([^\"]*)"/gim, `fill=${color}`);
+  // svgText = svgText.replace(/fill="([^\"]*)"/gim, fill=${color});
 
   svgText = svgText.replace(/\\llbracket/g, "⟦");
   svgText = svgText.replace(/\\rrbracket/g, "⟧");
@@ -108,12 +108,18 @@ const GenerateSvgComponent = ({ item, fontSize, color, setIsTabular }) => {
   }, [isTabular]);
 
   return (
-    <Text allowFontScaling={false}>
+    <View
+      style={{
+        // borderColor: "blue",
+        // borderWidth: 1,
+        flexDirection: "row",
+        alignSelf: "center",
+      }}
+    >
       <SvgFromXml xml={svgText} />
-    </Text>
+    </View>
   );
 };
-
 const GenerateTextComponent = ({
   fontSize,
   color,
@@ -171,19 +177,72 @@ const GenerateTextComponent = ({
     setBoldTextRanges(matches);
   }, [text]);
 
+  const checkNumberedListOrColon = () => {
+    // Checks for headings starting with '#', followed by a space,
+    // then an uppercase letter, optional punctuation, and ending with a colon and optional space.
+    const pattern1 = /^\s*#+\s*[A-ZÇĞİÖŞÜ][^:'"]*:\s*$/m.test(text);
+
+    // Checks for lines starting with optional whitespace, followed by a number,
+    // then a dot or colon, and ending with optional whitespace.
+    const pattern2 = /^\s*\d+(\.|:)\s*/m.test(text);
+
+    // Checks for lines starting with optional whitespace,
+    // followed by a letter, number, or Roman numeral, then a closing parenthesis, and ending with optional whitespace.
+    const pattern3 = /^\s*([a-zA-Z0-9]+|[IVXLCDM]+)\)\s*/m.test(text);
+
+    // Checks for lines starting with optional whitespace, followed by a hyphen or bullet point, and then one or more spaces.
+    const pattern4 = /^\s*[-•]\s+/m.test(text);
+
+    // Checks for lines ending with a period (dot).
+    const pattern5 = /\.\s*$/m.test(text);
+
+    // Checks for lines ending with punctuation.
+    const pattern6 = /[,;]\s*$/m.test(text);
+
+    // Checks for lines ending with a colon, but not single-word lines.
+    const pattern7 = /^(?!\s*\b\w+\b\s*:\s*$).*:\s*$/m.test(text);
+
+    // Checks for single characters or Roman numerals followed by a colon.
+    const pattern8 = /^\s*([A-Z]|[IVXLCDM]+|\d+):\s*$/m.test(text);
+
+    return (
+      pattern1 ||
+      pattern2 ||
+      pattern3 ||
+      pattern4 ||
+      pattern5 ||
+      pattern6 ||
+      pattern7 ||
+      pattern8
+    );
+  };
+
   const cleanText = text
-    ?.split(/\r?\n/)
-    .filter((line) => line.trim() !== "")
-    .join("\n")
-    .replace(/\.\n/g, ".\n ") //move down one line after the dot mark.
-    .replace(/hline/g, "")
-    .replace(/end{tabular}/g, "")
-    .replace(/begin{tabular}/g, "")
-    .replace(/\\/g, "")
-    .replace(/\*\*(.*?)\*\*/g, (_, p1) => `@+${p1}@+`)
-    .replace(/###(.*?)/g, (_, p1) => `@+${p1}@+`)
-    .replace(/##(.*?)/g, (_, p1) => `@+${p1}@+`)
-    .replace(/#(.*?)/g, (_, p1) => `@+${p1}@+`);
+    ?.split(/\r?\n/) // split the text into lines
+    .filter((line) => line.trim() !== "") // remove empty lines
+    .join("\n") // join the lines back together
+    .replace(
+      /(^|\n)(#+\s.*$)/gm,
+      (match) => `@+\n${match.replace(/^#+\s/, "")}@+`
+    ) // wrap headings with '@+' and '@+' and add a blank line before headings
+    .replace(/^(#+\s.*$)/gm, (match) => `${match.replace(/^#+\s/, "")}`) // remove the '#' from headings
+    .replace(/\\/g, "") // remove backslashes ('\')
+    .replace(/\*\*(.*?)\*\*/g, (_, p1) => `@+${p1}@+`) // wrap bold text markers with '@+' and '@+'
+    .replace(/\*\*/g, "") // remove ** markers
+    .replace(/^\s*[\p{P}\p{S}]\s*$/gmu, "") // remove single punctuation marks that are alone on a line
+    .replace(/^\s*[\p{P}\p{S}]\s*[\p{P}\p{S}]\s*$/gmu, "") // remove specific patterns like ): or ).
+
+    // clean up table headers and separators
+    .replace(/hline/g, "") // remove occurrences of 'hline'
+    .replace(/end{tabular}/g, "") // remove occurrences of 'end{tabular}'
+    .replace(/begin{tabular}/g, "") // remove occurrences of 'begin{tabular}'
+    .replace(/(?:\|:?\s*[-:]+\s*)+\|?/g, "") // remove table headers and separators
+    .replace(/^\s*\|\s*(?:[-:]+\s*)+\|?\s*$/gm, "") // remove table header rows
+    .replace(/^\s*\|\s*(?:[^|]*\s*)+\|?\s*$/gm, "") // remove table data rows
+    .replace(/^\s*\|\s*(?:\s*[-:]+\s*)+\|?\s*$/gm, "") // remove table separator rows
+    .trim(); // trim leading and trailing whitespace
+
+  const isNumberedListOrColon = checkNumberedListOrColon();
 
   const content = !!cleanText ? (
     <Text
@@ -191,9 +250,19 @@ const GenerateTextComponent = ({
       key={`sub-${index}`}
       style={[
         {
+          textAlign: "left",
+          textAlignVertical: "bottom",
           fontSize: fontSize * 2,
           display: cleanText?.trim() === "" ? "none" : "flex",
-          maxHeight: "auto",
+          height: "auto",
+          width:
+            cleanText.length > 34 || isNumberedListOrColon ? "100%" : "auto",
+          display: "flex",
+          flexGrow: 0,
+          flexShrink: 1,
+          flexBasis: "auto",
+          flexWrap: "nowrap",
+          marginBottom: -5,
         },
         textStyle,
       ]}
@@ -204,7 +273,12 @@ const GenerateTextComponent = ({
           return chunk;
         } else {
           return (
-            <Text key={`bold-${i}`} style={{ fontWeight: "700" }}>
+            <Text
+              key={`bold-${i}`}
+              style={{
+                fontWeight: "700",
+              }}
+            >
               {chunk}
             </Text>
           );
@@ -236,19 +310,17 @@ const GenerateTextComponent = ({
     item &&
     item?.children !== undefined &&
     item.children[0].attributes?.width !== undefined
-      ? Number((item?.children[0]?.attributes?.width).split("ex")[0])
+      ? Number(item?.children[0]?.attributes?.width.split("ex")[0])
       : 1;
 
   const checkWidth = Boolean(svgItemWidth > 40);
 
   const containerStyle = {
-    alignSelf: "baseline",
     height: "auto",
     display: text?.trim() === "" ? "none" : "flex",
-    marginVertical: 1,
-    flexGrow: 1,
     borderColor: "transparent",
     borderWidth: 1,
+    flexDirection: "row",
   };
 
   const scrollContainerStyle = {
@@ -264,35 +336,37 @@ const GenerateTextComponent = ({
 
   if (item?.kind === "mjx-container" && checkWidth) {
     return (
-      <ScrollView
-        horizontal={true}
-        contentContainerStyle={[
-          containerStyle,
-          { display: isTabular ? "none" : "flex" },
-        ]}
-        scrollIndicatorInsets={{ top: 30 }}
-        showsHorizontalScrollIndicator={false}
-        persistentScrollbar={false}
-      >
-        <TouchableWithoutFeedback>
-          <View style={scrollContainerStyle}>
-            {checkWidth && (
-              <Text
-                style={{
-                  flexDirection: "row",
-                  color: scrollIconColor,
-                  paddingRight: 10,
-                  alignSelf: "center",
-                }}
-              >
-                {" "}
-                {">>"}
-              </Text>
-            )}
-            {content}
-          </View>
-        </TouchableWithoutFeedback>
-      </ScrollView>
+      <View style={{ flexDirection: "row", width: "100%" }}>
+        <ScrollView
+          horizontal={true}
+          contentContainerStyle={[
+            containerStyle,
+            { display: isTabular ? "none" : "flex" },
+          ]}
+          scrollIndicatorInsets={{ top: 30 }}
+          showsHorizontalScrollIndicator={false}
+          persistentScrollbar={false}
+        >
+          <TouchableWithoutFeedback>
+            <View style={scrollContainerStyle}>
+              {checkWidth && (
+                <Text
+                  style={{
+                    flexDirection: "row",
+                    color: scrollIconColor,
+                    paddingRight: 10,
+                    alignSelf: "center",
+                  }}
+                >
+                  {" "}
+                  {">>"}
+                </Text>
+              )}
+              {content}
+            </View>
+          </TouchableWithoutFeedback>
+        </ScrollView>
+      </View>
     );
   } else {
     return <View style={containerStyle}>{content}</View>;
@@ -349,13 +423,16 @@ const ConvertToComponent = ({
   }
 
   const nodes = adaptor.childNodes(adaptor.body(html.document));
+
   return (
     <View
       style={{
-        flexDirection: "column",
+        flexDirection: "row",
         flexWrap: "wrap",
-        gap: 5,
-        alignItems: "flex-start",
+        rowGap: 15,
+        columnGap: 5,
+        justifyContent: "flex-start",
+        alignItems: "flex-end",
       }}
     >
       {nodes?.map((item, index) => (
