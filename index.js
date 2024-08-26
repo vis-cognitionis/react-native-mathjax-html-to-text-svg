@@ -1,5 +1,11 @@
 import React, { memo } from "react";
-import { ScrollView, Text, TouchableWithoutFeedback, View } from "react-native";
+import {
+  ScrollView,
+  Text,
+  TouchableWithoutFeedback,
+  View,
+  StyleSheet,
+} from "react-native";
 import { SvgFromXml } from "react-native-svg";
 
 import { decode } from "html-entities";
@@ -11,7 +17,6 @@ const SVG = require("./mathjax/output/svg").SVG;
 const liteAdaptor = require("./mathjax/adaptors/liteAdaptor").liteAdaptor;
 const RegisterHTMLHandler =
   require("./mathjax/handlers/html").RegisterHTMLHandler;
-
 const AllPackages = require("./mathjax/input/tex/AllPackages").AllPackages;
 
 const packageList = AllPackages.sort()
@@ -80,7 +85,7 @@ const applyColor = (svgString, fillColor) => {
   return svgString.replace(/currentColor/gim, `${fillColor}`);
 };
 
-const GenerateSvgComponent = ({ item, fontSize, color, setIsTabular }) => {
+const GenerateSvgComponent = ({ item, fontSize, color, styles }) => {
   let svgText = adaptor.innerHTML(item);
 
   const [width, height] = getScale(svgText);
@@ -91,48 +96,41 @@ const GenerateSvgComponent = ({ item, fontSize, color, setIsTabular }) => {
     '<rect fill="transparent" stroke="white" stroke-width="30">'
   );
 
-  //to hide for tables
+  //to hide for rects
   svgText = svgText.replace(/<g[^>]*data-mml-node="merror"[^>]*>/g, "");
-  // svgText = svgText.replace(/fill="([^\"]*)"/gim, fill=${color});
 
   svgText = svgText.replace(/\\llbracket/g, "⟦");
   svgText = svgText.replace(/\\rrbracket/g, "⟧");
 
-  svgText = applyScale(svgText, [(width * fontSize) / 1.1, height * fontSize]);
+  svgText = applyScale(svgText, [(width * fontSize) / 1, height * fontSize]);
   svgText = applyColor(svgText, color);
-
-  const isTabular = svgText.includes("tabular");
-
-  React.useEffect(() => {
-    setIsTabular(isTabular);
-  }, [isTabular]);
 
   return (
     <View
-      style={{
-        // borderColor: "blue",
-        // borderWidth: 1,
-        flexDirection: "row",
-        alignSelf: "center",
-      }}
+      style={[
+        styles.mathSvgs,
+        {
+          minWidth: height > 8 ? "100%" : "auto",
+        },
+      ]}
     >
       <SvgFromXml xml={svgText} />
     </View>
   );
 };
+
 const GenerateTextComponent = ({
   fontSize,
   color,
   index,
   item,
   parentStyle = null,
-  textStyle,
   scrollBorderColor,
   scrollIconColor,
+  styles,
 }) => {
   let rnStyle = null;
   let text = null;
-  const [isTabular, setIsTabular] = React.useState(false);
 
   if (
     item?.kind !== "#text" &&
@@ -165,145 +163,202 @@ const GenerateTextComponent = ({
     rnStyle = { width: "100%", overflow: "hidden", height: 0 };
   }
 
-  const [boldTextRanges, setBoldTextRanges] = React.useState([]);
-
-  React.useEffect(() => {
-    const regex = /\*\*(.*?)\*\*/g;
-    const matches = [];
-    let match;
-    while ((match = regex.exec(text)) !== null) {
-      matches.push({ start: match.index, end: regex.lastIndex });
-    }
-    setBoldTextRanges(matches);
-  }, [text]);
-
-  const checkNumberedListOrColon = () => {
-    // Checks for headings starting with '#', followed by a space,
-    // then an uppercase letter, optional punctuation, and ending with a colon and optional space.
-    const pattern1 = /^\s*#+\s*[A-ZÇĞİÖŞÜ][^:'"]*:\s*$/m.test(text);
-
-    // Checks for lines starting with optional whitespace, followed by a number,
-    // then a dot or colon, and ending with optional whitespace.
-    const pattern2 = /^\s*\d+(\.|:)\s*/m.test(text);
-
-    // Checks for lines starting with optional whitespace,
-    // followed by a letter, number, or Roman numeral, then a closing parenthesis, and ending with optional whitespace.
-    const pattern3 = /^\s*([a-zA-Z0-9]+|[IVXLCDM]+)\)\s*/m.test(text);
-
-    // Checks for lines starting with optional whitespace, followed by a hyphen or bullet point, and then one or more spaces.
-    const pattern4 = /^\s*[-•]\s+/m.test(text);
-
-    // Checks for lines ending with a period (dot).
-    const pattern5 = /\.\s*$/m.test(text);
-
-    // Checks for lines ending with punctuation.
-    const pattern6 = /[,;]\s*$/m.test(text);
-
-    // Checks for lines ending with a colon, but not single-word lines.
-    const pattern7 = /^(?!\s*\b\w+\b\s*:\s*$).*:\s*$/m.test(text);
-
-    // Checks for single characters or Roman numerals followed by a colon.
-    const pattern8 = /^\s*([A-Z]|[IVXLCDM]+|\d+):\s*$/m.test(text);
-
-    return (
-      pattern1 ||
-      pattern2 ||
-      pattern3 ||
-      pattern4 ||
-      pattern5 ||
-      pattern6 ||
-      pattern7 ||
-      pattern8
-    );
-  };
-
   const cleanText = text
     ?.split(/\r?\n/) // split the text into lines
     .filter((line) => line.trim() !== "") // remove empty lines
     .join("\n") // join the lines back together
-    .replace(
-      /(^|\n)(#+\s.*$)/gm,
-      (match) => `@+\n${match.replace(/^#+\s/, "")}@+`
-    ) // wrap headings with '@+' and '@+' and add a blank line before headings
-    .replace(/^(#+\s.*$)/gm, (match) => `${match.replace(/^#+\s/, "")}`) // remove the '#' from headings
     .replace(/\\/g, "") // remove backslashes ('\')
-    .replace(/\*\*(.*?)\*\*/g, (_, p1) => `@+${p1}@+`) // wrap bold text markers with '@+' and '@+'
-    .replace(/\*\*/g, "") // remove ** markers
-    .replace(/^\s*[\p{P}\p{S}]\s*$/gmu, "") // remove single punctuation marks that are alone on a line
+    .replace(
+      /(?<!\S)\*\*(?!\S)|(?<!\S)[*:]+(?!\S)|(?<!\S)\*\*[^\S\n]*\*\*(?!\S)|\|\s*([a-zA-Z0-9]+\))/g,
+      "$1"
+    ) // remove single punctuation marks
     .replace(/^\s*[\p{P}\p{S}]\s*[\p{P}\p{S}]\s*$/gmu, "") // remove specific patterns like ): or ).
-
-    // clean up table headers and separators
-    .replace(/hline/g, "") // remove occurrences of 'hline'
-    .replace(/end{tabular}/g, "") // remove occurrences of 'end{tabular}'
-    .replace(/begin{tabular}/g, "") // remove occurrences of 'begin{tabular}'
-    .replace(/(?:\|:?\s*[-:]+\s*)+\|?/g, "") // remove table headers and separators
-    .replace(/^\s*\|\s*(?:[-:]+\s*)+\|?\s*$/gm, "") // remove table header rows
-    .replace(/^\s*\|\s*(?:[^|]*\s*)+\|?\s*$/gm, "") // remove table data rows
-    .replace(/^\s*\|\s*(?:\s*[-:]+\s*)+\|?\s*$/gm, "") // remove table separator rows
+    //.replace(/(?<=\s|^)-(?=\s|$)/g, "") // remove standalone hyphens
     .trim(); // trim leading and trailing whitespace
 
-  const isNumberedListOrColon = checkNumberedListOrColon();
+  const formatTextForReactNative = () => {
+    const lines = cleanText?.split("\n");
+    const formattedComponents = [];
 
-  const content = !!cleanText ? (
-    <Text
-      allowFontScaling={false}
-      key={`sub-${index}`}
-      style={[
-        {
-          textAlign: "left",
-          textAlignVertical: "bottom",
-          fontSize: fontSize * 2,
-          display: cleanText?.trim() === "" ? "none" : "flex",
-          height: "auto",
-          width:
-            cleanText.length > 34 || isNumberedListOrColon ? "100%" : "auto",
-          display: "flex",
-          flexGrow: 0,
-          flexShrink: 1,
-          flexBasis: "auto",
-          flexWrap: "nowrap",
-          marginBottom: -5,
-        },
-        textStyle,
-      ]}
-      textBreakStrategy="highQuality"
-    >
-      {cleanText.split("@+").map((chunk, i) => {
-        if (i % 2 === 0) {
-          return chunk;
-        } else {
-          return (
-            <Text
-              key={`bold-${i}`}
-              style={{
-                fontWeight: "700",
-              }}
+    let inTable = false;
+    let tableRows = [];
+    let isFirstRow = true;
+    let maxCellWidth = 0;
+
+    const calculateMaxCellWidth = (cells) => {
+      let maxWidth = 0;
+      cells.forEach((cell) => {
+        const cellWidth = cell.trim().length * 10;
+        if (cellWidth > maxWidth) {
+          maxWidth = cellWidth;
+        }
+      });
+      return maxWidth;
+    };
+
+    lines?.forEach((line, index) => {
+      // process headings
+      if (line.startsWith("#")) {
+        const level = line.match(/^#+/)[0].length;
+        const content = line.replace(/^#+\s*/, "");
+        formattedComponents.push(
+          content ? (
+            <Text key={index} style={styles[`heading${level}`]}>
+              {content}
+            </Text>
+          ) : null
+        );
+      }
+
+      // process tables
+      else if (line?.trim().startsWith("|") && line.trim().endsWith("|")) {
+        if (!inTable) {
+          inTable = true;
+          tableRows = [];
+          isFirstRow = true;
+        }
+        if (line.includes("---")) {
+          // skip heading separator line
+          return;
+        }
+
+        const cells = line?.split("|").filter((cell) => cell.trim() !== "");
+        // Calculate the max cell width
+        const rowMaxWidth = calculateMaxCellWidth(cells);
+        if (rowMaxWidth > maxCellWidth) {
+          maxCellWidth = rowMaxWidth; // Keep track of the largest width overall
+        }
+
+        const rowStyle = isFirstRow
+          ? [styles.tableRow, styles.tableHeader]
+          : styles.tableRow;
+
+        tableRows.push(
+          <View key={`row-${index}`} style={rowStyle}>
+            {cells.map((cell, cellIndex) => (
+              <Text
+                key={`cell-${index}-${cellIndex}`}
+                style={[
+                  styles.tableCell,
+                  { minWidth: maxCellWidth },
+                  isFirstRow && styles.firstRow,
+                ]}
+              >
+                {cell.trim()}
+              </Text>
+            ))}
+          </View>
+        );
+        isFirstRow = false;
+      } else {
+        // If we were in a table, push the collected table rows as a component
+        if (inTable) {
+          formattedComponents.push(
+            <ScrollView
+              horizontal
+              key={`table-${index}`}
+              style={{ width: "100%", minWidth: "100%" }}
             >
-              {chunk}
+              <View style={styles.table}>{tableRows}</View>
+            </ScrollView>
+          );
+          inTable = false;
+          tableRows = [];
+        }
+
+        // process normal paragraphs
+        if (line?.trim() !== "") {
+          const parts = line?.split(
+            /(\*\*.*?\*\*)|(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)/gu
+          );
+
+          const formattedLine = parts.map((part, partIndex) => {
+            if (part && part.startsWith("**") && part.endsWith("**")) {
+              return (
+                <Text key={`bold-${index}-${partIndex}`} style={styles.bold}>
+                  {part.replace(/^\*\*|\*\*$/g, "")}
+                </Text>
+              );
+            } else if (
+              part &&
+              /\p{Emoji_Presentation}|\p{Emoji}\uFE0F/u.test(part)
+            ) {
+              return (
+                <Text key={`emoji-${index}-${partIndex}`} style={styles.emoji}>
+                  {part}
+                </Text>
+              );
+            }
+
+            // regex to match list numbering patterns like "1.", "a)", "IV.", etc.
+            const listNumberingRegex =
+              /^\s*[0-9]+\.\s|^\s*[a-zA-Z]\)\s|^\s*[IVXLCDM]+\.\s/;
+
+            if (listNumberingRegex.test(part?.trim())) {
+              return (
+                <View key={`list-numbering-${index}-${partIndex}`}>
+                  <Text
+                    key={`bold-number-${index}-${partIndex}`}
+                    style={[styles.bold]}
+                  >
+                    {part.replace(/\*\*/g, "")}
+                  </Text>
+                </View>
+              );
+            }
+
+            return <Text key={`part-${index}-${partIndex}`}>{part}</Text>;
+          });
+
+          const regex =
+            /^(?:[A-Za-z]+[):,]|[IVXLCDM]+[.:,]|[0-9]+[):,]|.*(?<!^)[,:)](?=\s|$))\s*/gm;
+          const result = regex.test(text);
+
+          formattedComponents.push(
+            <Text
+              key={index}
+              style={[
+                styles.paragraph,
+                result && {
+                  width: "100%",
+                },
+              ]}
+            >
+              {formattedLine}
             </Text>
           );
         }
-      })}
-    </Text>
+      }
+    });
+
+    // If the text ends with a table, ensure it's added
+    if (inTable) {
+      formattedComponents.push(
+        <ScrollView
+          horizontal
+          key="last-table"
+          style={{ width: "100%", minWidth: "100%" }}
+        >
+          <View style={styles.table}>{tableRows}</View>
+        </ScrollView>
+      );
+    }
+
+    return formattedComponents;
+  };
+
+  const formattedComponents = formatTextForReactNative(text);
+
+  const content = !!text ? (
+    <View style={styles.formattedTextStyles}>{formattedComponents}</View>
   ) : item?.kind === "mjx-container" ? (
     <GenerateSvgComponent
       key={`sub-${index}`}
       item={item}
       fontSize={fontSize}
       color={color}
-      setIsTabular={setIsTabular}
+      styles={styles}
     />
-  ) : item.children?.length ? (
-    item.children.map((subItem, subIndex) => (
-      <GenerateTextComponent
-        key={`sub-${index}-${subIndex}`}
-        color={color}
-        fontSize={fontSize}
-        item={subItem}
-        index={subIndex}
-        parentStyle={rnStyle}
-      />
-    ))
   ) : null;
 
   const svgItemWidth =
@@ -315,40 +370,24 @@ const GenerateTextComponent = ({
 
   const checkWidth = Boolean(svgItemWidth > 40);
 
-  const containerStyle = {
-    height: "auto",
-    display: text?.trim() === "" ? "none" : "flex",
-    borderColor: "transparent",
-    borderWidth: 1,
-    flexDirection: "row",
-  };
-
-  const scrollContainerStyle = {
-    flexDirection: "row",
-    borderWidth: 1,
-    borderColor: scrollBorderColor,
-    borderStyle: "dashed",
-    borderTopLeftRadius: 8,
-    borderBottomLeftRadius: 8,
-    paddingVertical: 10,
-    paddingRight: 10,
-  };
-
   if (item?.kind === "mjx-container" && checkWidth) {
     return (
       <View style={{ flexDirection: "row", width: "100%" }}>
         <ScrollView
           horizontal={true}
-          contentContainerStyle={[
-            containerStyle,
-            { display: isTabular ? "none" : "flex" },
-          ]}
           scrollIndicatorInsets={{ top: 30 }}
           showsHorizontalScrollIndicator={false}
           persistentScrollbar={false}
         >
           <TouchableWithoutFeedback>
-            <View style={scrollContainerStyle}>
+            <View
+              style={[
+                styles.scrollContainerStyle,
+                {
+                  borderColor: scrollBorderColor,
+                },
+              ]}
+            >
               {checkWidth && (
                 <Text
                   style={{
@@ -369,7 +408,7 @@ const GenerateTextComponent = ({
       </View>
     );
   } else {
-    return <View style={containerStyle}>{content}</View>;
+    return <View>{content}</View>;
   }
 };
 
@@ -381,6 +420,7 @@ const ConvertToComponent = ({
   textStyle,
   scrollBorderColor,
   scrollIconColor,
+  styles,
 }) => {
   if (!texString) {
     return "";
@@ -425,16 +465,7 @@ const ConvertToComponent = ({
   const nodes = adaptor.childNodes(adaptor.body(html.document));
 
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        flexWrap: "wrap",
-        rowGap: 15,
-        columnGap: 5,
-        justifyContent: "flex-start",
-        alignItems: "flex-end",
-      }}
-    >
+    <View style={styles.container}>
       {nodes?.map((item, index) => (
         <GenerateTextComponent
           key={index}
@@ -445,6 +476,7 @@ const ConvertToComponent = ({
           color={color}
           scrollBorderColor={scrollBorderColor}
           scrollIconColor={scrollIconColor}
+          styles={styles}
         />
       ))}
     </View>
@@ -454,7 +486,7 @@ const ConvertToComponent = ({
 export const MathJaxSvg = memo((props) => {
   const textext = props.children || "";
   const fontSize = props.fontSize ? props.fontSize / 2 : 14;
-  const color = props.color ? props.color : "black";
+  const color = props.color ? props.color : "white";
   const fontCache = props.fontCache;
   const style = props.style ? props.style : null;
   const scrollIconColor = props.scrollIconColor
@@ -463,6 +495,140 @@ export const MathJaxSvg = memo((props) => {
   const scrollBorderColor = props.scrollBorderColor
     ? props.scrollBorderColor
     : "white";
+
+  const defaultStyles = StyleSheet.create({
+    container: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      rowGap: 15,
+      columnGap: 5,
+      justifyContent: "flex-start",
+      alignItems: "center",
+      // borderColor: "yellow",
+      // borderWidth: 1
+    },
+    mathSvgs: {
+      // borderColor: "blue",
+      // borderWidth: 1,
+      flexDirection: "row",
+      alignSelf: "center",
+      marginHorizontal: 5,
+    },
+    formattedTextStyles: {
+      flexDirection: "row",
+      maxWidth: "100%",
+      flexWrap: "wrap",
+      width: "100%",
+      // borderColor:"red",
+      // borderWidth:1
+    },
+    scrollContainerStyle: {
+      flexDirection: "row",
+      borderWidth: 1,
+      borderStyle: "dashed",
+      borderTopLeftRadius: 8,
+      borderBottomLeftRadius: 8,
+      paddingVertical: 10,
+      paddingRight: 10,
+    },
+    heading1: {
+      fontSize: 20,
+      fontWeight: "bold",
+      marginVertical: 14,
+      color: "white",
+      width: "100%",
+    },
+    heading2: {
+      fontSize: 18,
+      fontWeight: "bold",
+      marginVertical: 14,
+      color: "white",
+      width: "100%",
+    },
+    heading3: {
+      fontSize: 16,
+      fontWeight: "bold",
+      marginVertical: 10,
+      color: "white",
+      width: "100%",
+      textDecorationStyle: "solid",
+      textDecorationLine: "underline",
+    },
+    heading4: {
+      fontSize: 16,
+      fontWeight: "bold",
+      marginVertical: 10,
+      color: "white",
+      width: "100%",
+    },
+    paragraph: {
+      // color: "pink",
+      // fontFamily: "Times New Roman",
+      // borderColor: "orange",
+      // borderWidth: 1,
+      color: "white",
+      fontSize: 16,
+      maxWidth: "100%",
+      minWidth: "auto",
+      width: "auto",
+      lineHeight: 21,
+      marginVertical: 5,
+      display: "flex",
+      flexWrap: "nowrap",
+    },
+    bold: {
+      fontWeight: "bold",
+      color: "white",
+      fontSize: 16,
+      width: "100%",
+      minWidth: "100%",
+      // borderColor: "orange",
+      // borderWidth: 1,
+    },
+    table: {
+      borderWidth: 0.5,
+      borderColor: "#FFFFFF4D",
+      margin: 5,
+      color: "white",
+    },
+    tableRow: {
+      flexDirection: "row",
+      color: "white",
+    },
+    tableHeader: {
+      color: "white",
+      fontWeight: "bold",
+    },
+    tableCell: {
+      width: "auto",
+      display: "flex",
+      paddingVertical: 4,
+      paddingLeft: 4,
+      borderWidth: 1,
+      borderColor: "#FFFFFF4D",
+      backgroundColor: "transparent",
+      color: "white",
+    },
+    firstRow: {
+      fontWeight: "bold",
+      flex: 1,
+      width: "auto",
+      backgroundColor: "#E6D19033",
+    },
+  });
+
+  // Merge default styles with user-provided styles
+  const mergeStyles = (defaultStyles, customStyles = {}) => {
+    const merged = {};
+    for (const key in defaultStyles) {
+      if (defaultStyles.hasOwnProperty(key)) {
+        merged[key] = { ...defaultStyles[key], ...(customStyles[key] || {}) };
+      }
+    }
+    return merged;
+  };
+
+  const mergedStyles = mergeStyles(defaultStyles, props.styles || {});
 
   return (
     <View style={{ flexWrap: "wrap", ...style }}>
@@ -475,6 +641,7 @@ export const MathJaxSvg = memo((props) => {
           fontCache={fontCache}
           scrollBorderColor={scrollBorderColor}
           scrollIconColor={scrollIconColor}
+          styles={mergedStyles}
         />
       ) : null}
     </View>
