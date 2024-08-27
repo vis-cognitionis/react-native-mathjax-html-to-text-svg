@@ -99,8 +99,12 @@ const GenerateSvgComponent = ({ item, fontSize, color, styles }) => {
   //to hide for rects
   svgText = svgText.replace(/<g[^>]*data-mml-node="merror"[^>]*>/g, "");
 
+  // to remove unnecessary parentheses
   svgText = svgText.replace(/\\llbracket/g, "⟦");
   svgText = svgText.replace(/\\rrbracket/g, "⟧");
+  svgText = svgText.replace(/\\\]/g, "");
+  svgText = svgText.replace(/\\\(/g, "");
+  svgText = svgText.replace(/\\\)/g, "");
 
   svgText = applyScale(svgText, [(width * fontSize) / 1, height * fontSize]);
   svgText = applyColor(svgText, color);
@@ -173,7 +177,8 @@ const GenerateTextComponent = ({
       "$1"
     ) // remove single punctuation marks
     .replace(/^\s*[\p{P}\p{S}]\s*[\p{P}\p{S}]\s*$/gmu, "") // remove specific patterns like ): or ).
-    //.replace(/(?<=\s|^)-(?=\s|$)/g, "") // remove standalone hyphens
+    .replace(/-{2,}/g, "") // remove standalone triple dashes
+    .replace(/^\s*\*\*\.\s*$/gm, "") // remove standalone **. marks
     .trim(); // trim leading and trailing whitespace
 
   const formatTextForReactNative = () => {
@@ -235,18 +240,28 @@ const GenerateTextComponent = ({
 
         tableRows.push(
           <View key={`row-${index}`} style={rowStyle}>
-            {cells.map((cell, cellIndex) => (
-              <Text
-                key={`cell-${index}-${cellIndex}`}
-                style={[
-                  styles.tableCell,
-                  { minWidth: maxCellWidth },
-                  isFirstRow && styles.firstRow,
-                ]}
-              >
-                {cell.trim()}
-              </Text>
-            ))}
+            {cells.map((cell, cellIndex) => {
+              const boldCell = cell.includes("**") ? (
+                <Text style={styles.bold}>
+                  {cell.replace(/\*\*/g, "").trim()}
+                </Text>
+              ) : (
+                cell.trim()
+              );
+
+              return (
+                <Text
+                  key={`cell-${index}-${cellIndex}`}
+                  style={[
+                    styles.tableCell,
+                    { minWidth: maxCellWidth },
+                    isFirstRow && styles.firstRow,
+                  ]}
+                >
+                  {boldCell}
+                </Text>
+              );
+            })}
           </View>
         );
         isFirstRow = false;
@@ -296,7 +311,12 @@ const GenerateTextComponent = ({
 
             if (listNumberingRegex.test(part?.trim())) {
               return (
-                <View key={`list-numbering-${index}-${partIndex}`}>
+                <View
+                  style={{
+                    minWidth: "100%",
+                  }}
+                  key={`list-numbering-${index}-${partIndex}`}
+                >
                   <Text
                     key={`bold-number-${index}-${partIndex}`}
                     style={[styles.bold]}
@@ -580,8 +600,8 @@ export const MathJaxSvg = memo((props) => {
       fontWeight: "bold",
       color: "white",
       fontSize: 16,
-      width: "100%",
-      minWidth: "100%",
+      // width: "100%",
+      // minWidth: "100%",
       // borderColor: "orange",
       // borderWidth: 1,
     },
