@@ -557,6 +557,7 @@ export const MathJaxSvg = memo((props) => {
       marginVertical: 14,
       color: "white",
       width: "100%",
+      flexWrap: "wrap",
     },
     heading2: {
       fontSize: 18,
@@ -564,6 +565,7 @@ export const MathJaxSvg = memo((props) => {
       marginVertical: 14,
       color: "white",
       width: "100%",
+      flexWrap: "wrap",
     },
     heading3: {
       fontSize: 16,
@@ -573,6 +575,7 @@ export const MathJaxSvg = memo((props) => {
       width: "100%",
       textDecorationStyle: "solid",
       textDecorationLine: "underline",
+      flexWrap: "wrap",
     },
     heading4: {
       fontSize: 16,
@@ -580,6 +583,7 @@ export const MathJaxSvg = memo((props) => {
       marginVertical: 10,
       color: "white",
       width: "100%",
+      flexWrap: "wrap",
     },
     paragraph: {
       // color: "pink",
@@ -600,6 +604,7 @@ export const MathJaxSvg = memo((props) => {
       fontWeight: "bold",
       color: "white",
       fontSize: 16,
+      flexWrap: "wrap",
       // width: "100%",
       // minWidth: "100%",
       // borderColor: "orange",
