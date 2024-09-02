@@ -206,10 +206,22 @@ const GenerateTextComponent = ({
       if (line.startsWith("#")) {
         const level = line.match(/^#+/)[0].length;
         const content = line.replace(/^#+\s*/, "");
+        const contentWithBold = content
+          .split(/\*\*(.*?)\*\*/)
+          .map((part, index) =>
+            index % 2 === 1 ? (
+              <Text key={index} style={{ fontWeight: "bold" }}>
+                {part}
+              </Text>
+            ) : (
+              part
+            )
+          );
+
         formattedComponents.push(
           content ? (
             <Text key={index} style={styles[`heading${level}`]}>
-              {content}
+              {contentWithBold}
             </Text>
           ) : null
         );
@@ -284,7 +296,7 @@ const GenerateTextComponent = ({
         // process normal paragraphs
         if (line?.trim() !== "") {
           const parts = line?.split(
-            /(\*\*.*?\*\*)|(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)/gu
+            /(\*\*.*?\*\*|\*.*?\*)|(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)/gu
           );
 
           const formattedLine = parts.map((part, partIndex) => {
@@ -303,6 +315,15 @@ const GenerateTextComponent = ({
                   {part}
                 </Text>
               );
+            } else if (part && part.startsWith("*") && part.endsWith("*")) {
+              return (
+                <Text
+                  key={`italic-${index}-${partIndex}`}
+                  style={styles.italic}
+                >
+                  {part.replace(/^\*|\*$/g, "")}
+                </Text>
+              );
             }
 
             // regex to match list numbering patterns like "1.", "a)", "IV.", etc.
@@ -311,19 +332,12 @@ const GenerateTextComponent = ({
 
             if (listNumberingRegex.test(part?.trim())) {
               return (
-                <View
-                  style={{
-                    minWidth: "100%",
-                  }}
-                  key={`list-numbering-${index}-${partIndex}`}
+                <Text
+                  key={`bold-number-${index}-${partIndex}`}
+                  style={styles.bold}
                 >
-                  <Text
-                    key={`bold-number-${index}-${partIndex}`}
-                    style={[styles.bold]}
-                  >
-                    {part.replace(/\*\*/g, "")}
-                  </Text>
-                </View>
+                  {part.replace(/\*\*/g, "")}
+                </Text>
               );
             }
 
@@ -388,7 +402,7 @@ const GenerateTextComponent = ({
       ? Number(item?.children[0]?.attributes?.width.split("ex")[0])
       : 1;
 
-  const checkWidth = Boolean(svgItemWidth > 40);
+  const checkWidth = Boolean(svgItemWidth > 35);
 
   if (item?.kind === "mjx-container" && checkWidth) {
     return (
@@ -609,6 +623,10 @@ export const MathJaxSvg = memo((props) => {
       // minWidth: "100%",
       // borderColor: "orange",
       // borderWidth: 1,
+    },
+    italic: {
+      fontStyle: "italic",
+      color: "white",
     },
     table: {
       borderWidth: 0.5,
