@@ -5,6 +5,7 @@ import {
   TouchableWithoutFeedback,
   View,
   StyleSheet,
+  Dimensions,
 } from "react-native";
 import { SvgFromXml } from "react-native-svg";
 
@@ -402,7 +403,27 @@ const GenerateTextComponent = ({
       ? Number(item?.children[0]?.attributes?.width.split("ex")[0])
       : 1;
 
-  const checkWidth = Boolean(svgItemWidth > 35);
+  const SCREEN_SIZES = {
+    SMALL: 320,
+    MEDIUM: 360,
+  };
+
+  const SVG_SIZES = {
+    SMALL: 5,
+    MEDIUM: 25,
+    LARGE: 35,
+  };
+
+  const { width } = Dimensions.get("window");
+
+  const getSvgItemSize = (screenWidth) => {
+    if (screenWidth < SCREEN_SIZES.SMALL) return SVG_SIZES.SMALL;
+    if (screenWidth < SCREEN_SIZES.MEDIUM) return SVG_SIZES.MEDIUM;
+    return SVG_SIZES.LARGE;
+  };
+
+  const svgItem = getSvgItemSize(width);
+  const checkWidth = svgItemWidth > svgItem;
 
   if (item?.kind === "mjx-container" && checkWidth) {
     return (
