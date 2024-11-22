@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import React, { memo, useMemo } from "react";
 import {
   ScrollView,
   Text,
@@ -396,12 +396,25 @@ const GenerateTextComponent = ({
     />
   ) : null;
 
-  const svgItemWidth =
-    item &&
-    item?.children !== undefined &&
-    item.children[0].attributes?.width !== undefined
-      ? Number(item?.children[0]?.attributes?.width.split("ex")[0])
-      : 1;
+  const getSvgItemWidth = () => {
+    try {
+      if (!item?.children?.length) return 1;
+
+      const firstChild = item.children[0];
+      if (!firstChild?.attributes?.width) return 1;
+
+      const widthStr = firstChild.attributes.width;
+      if (typeof widthStr !== "string") return 1;
+
+      const parsedWidth = Number(widthStr.split("ex")[0]);
+      return isNaN(parsedWidth) ? 1 : parsedWidth;
+    } catch (error) {
+      console.warn("Error parsing SVG width:", error);
+      return 1;
+    }
+  };
+
+  const svgItemWidth = useMemo(() => getSvgItemWidth(), [item]);
 
   const SCREEN_SIZES = {
     SMALL: 320,
@@ -425,7 +438,11 @@ const GenerateTextComponent = ({
   const svgItem = getSvgItemSize(width);
   const checkWidth = svgItemWidth > svgItem;
 
-  if (item?.kind === "mjx-container" && checkWidth) {
+  if (!item) {
+    return null;
+  }
+
+  if (item.kind === "mjx-container" && checkWidth) {
     return (
       <View style={{ flexDirection: "row", width: "100%" }}>
         <ScrollView
@@ -462,9 +479,9 @@ const GenerateTextComponent = ({
         </ScrollView>
       </View>
     );
-  } else {
-    return <View>{content}</View>;
   }
+
+  return <View>{content}</View>;
 };
 
 const ConvertToComponent = ({
